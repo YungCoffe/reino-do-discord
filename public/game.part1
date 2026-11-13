@@ -1,0 +1,26 @@
+'use strict';
+(() => {
+const $ = id => document.getElementById(id), canvas = $('canvas'), ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+const W=960,H=540,WORLD=6000,GROUND=470, MAXHP=100;
+const palette={aurora:['#192341','#424d71','#687b98','#ffe5ae','#72d7c3'],violeta:['#261b3d','#5c3e6b','#a57891','#ffd2bc','#db91c7'],floresta:['#122e37','#285455','#56816a','#e2e7a9','#a4dc91']};
+const form=$('form'), keys={left:false,right:false,jump:false,attack:false}; let config, p, mobs, boss, shots=[], particles=[], remotes=new Map(), ws, running=false, camera=0,last=0,sendTimer=0, noticeTimer=0, checkpoint=false, won=false, jumpLatch=false, loopGeneration=0;
+const platforms=[{x:450,y:395,w:130},{x:735,y:340,w:125},{x:1050,y:395,w:150},{x:1440,y:370,w:145},{x:1780,y:400,w:145},{x:2070,y:330,w:120},{x:2390,y:390,w:130},{x:2760,y:350,w:140},{x:3100,y:400,w:140},{x:3440,y:340,w:130},{x:3790,y:385,w:140},{x:4140,y:400,w:120},{x:4550,y:370,w:110},{x:4920,y:380,w:110},{x:5260,y:390,w:120}];
+function safeLoad(){try{return JSON.parse(localStorage.getItem('ecos-config')||'{}')}catch{return {}}} const saved=safeLoad();
+if(typeof saved.name==='string') $('name').value=saved.name.slice(0,20);
+if(typeof saved.room==='string' && /^[a-z0-9-]{1,16}$/.test(saved.room)) $('room').value=saved.room;
+if(typeof saved.color==='string' && /^#[0-9a-f]{6}$/i.test(saved.color)) $('color').value=saved.color;
+for(const id of ['banner','theme']) if([...$(id).options].some(o=>o.value===saved[id])) $(id).value=saved[id];
+if(['cavaleiro','arqueira','mago'].includes(saved.avatar)) form.elements.class.value=saved.avatar;
+function save(){try{localStorage.setItem('ecos-config',JSON.stringify(config))}catch{}}
+function say(text,seconds=3){$('notice').textContent=text; $('notice').style.opacity='1';noticeTimer=seconds}
+function makeMobs(){return [720,1280,1870,2470,3020,3520,4040,4550].map((x,i)=>({x,y:GROUND-25,w:28,h:25,origin:x,dir:i%2?1:-1,hp:55,max:55,type:i%3,hit:0,dead:false}))}
+function makeBoss(){return {x:5220,y:GROUND-76,w:72,h:76,hp:300,max:300,dir:-1,shoot:1.5,hit:0,dead:false}}
+function init(){p={x:130,y:GROUND-34,w:22,h:34,vx:0,vy:0,dir:1,hp:MAXHP,grounded:false,inv:0,attack:0,anim:0}; mobs=makeMobs();boss=makeBoss();shots=[];particles=[];camera=0;checkpoint=false;won=false;jumpLatch=false;sendTimer=0;for(const k in keys)keys[k]=false; $('victory').hidden=true; $('boss-ui').hidden=true; $('objective').textContent='Atravesse o reino e derrote o Guardião do Eclipse'; updateHud(); say('Explore →  ·  derrote o guardião no fim do mapa',5)}
+function updateHud(){$('hp-fill').style.width=Math.max(0,p.hp)+'%';$('hp-text').textContent=Math.ceil(p.hp)+' / 100';$('boss-fill').style.width=Math.max(0,boss.hp/boss.max*100)+'%'}
+function connect(){remotes.clear(); const scheme=location.protocol==='https:'?'wss:':'ws:'; ws=new WebSocket(scheme+'//'+location.host); const socket=ws;
+ws.onopen=()=>{if(socket!==ws)return; socket.send(JSON.stringify({type:'join',room:config.room,name:config.name,color:config.color,banner:config.banner,avatar:config.avatar}))};
+ws.onmessage=e=>{if(socket!==ws)return;let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='welcome'){$('status').textContent='● Conectado · sala '+config.room;for(const other of m.players) remotes.set(other.id,{...other,drawX:other.x,drawY:other.y})}else if(m.type==='join'){remotes.set(m.player.id,{...m.player,drawX:m.player.x,drawY:m.player.y});say(m.player.name+' entrou na sala')}else if(m.type==='move'){const other=remotes.get(m.id);if(other)Object.assign(other,m)}else if(m.type==='leave')remotes.delete(m.id)};
+ws.onclose=e=>{if(socket!==ws)return;remotes.clear();$('status').textContent='● Desconectado · jogando sozinho';say((e.code===1013?'Sala ou servidor cheio.':'Conexão encerrada.')+' Saia e entre para reconectar.',5)};ws.onerror=()=>{};
+}
+form.addEventListener('submit',e=>{e.preventDefault(); const room=$('room').value.trim(); if(!/^[a-z0-9-]{1,16}$/.test(room)){ $('room').setCustomValidity('Use apenas letras minúsculas, números e hífen.');$('room').reportValidity();return} $('room').setCustomValidity('');config={name:$('name').value.replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0,20)||'Aventureiro',room,color:$('color').value,banner:$('banner').value,theme:$('theme').value,avatar:form.elements.class.value};save();$('setup').hidden=true;$('game').hidden=false;$('display-name').textContent=config.name;$('room-label').textContent='SALA: '+room;$('avatar-icon').textContent={cavaleiro:'⚔',arqueira:'➶',mago:'✦'}[config.avatar]; init();running=true;last=0;$('status').textContent='Conectando…';connect();const generation=++loopGeneration;requestAnimationFrame(t=>loop(t,generation))});
+$('room').addEventListener(
