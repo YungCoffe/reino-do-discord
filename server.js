@@ -16,10 +16,13 @@ function createServer() {
   const server = http.createServer((req, res) => {
     const entry = files[(req.url || '').split('?')[0]];
     if (req.method !== 'GET' || !entry) { res.writeHead(404); return res.end('Não encontrado'); }
-    fs.readFile(path.join(__dirname, 'public', entry[0]), (err, data) => {
-      if (err) { res.writeHead(500); return res.end('Erro'); }
+    const target = path.join(__dirname, 'public', entry[0]);
+    const read = entry[0] === 'game.js'
+      ? Promise.all(['game.part1', 'game.part2', 'game.part3'].map(p => fs.promises.readFile(path.join(__dirname, 'public', p)))).then(parts => Buffer.concat(parts))
+      : fs.promises.readFile(target);
+    read.then(data => {
       res.writeHead(200, { 'Content-Type': entry[1], 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'self'; connect-src 'self' ws: wss:; style-src 'self'; script-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'", 'Cache-Control': 'no-store' }); res.end(data);
-    });
+    }).catch(() => { res.writeHead(500); res.end('Erro'); });
   });
   const wss = new WebSocketServer({ server, maxPayload: 1024, perMessageDeflate: false });
   function send(ws, obj) {
