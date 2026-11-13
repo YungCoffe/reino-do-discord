@@ -1,0 +1,7 @@
+node_modules/
+.test-chrome/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
