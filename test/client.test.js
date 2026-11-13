@@ -22,7 +22,8 @@ test('cliente entra, move, pula e evita múltiplos loops ao reentrar', () => {
   const buttons=['left','right','jump','attack'].map(key=>{let e=new Element(key);e.dataset.key=key;return e});
   class Socket {static OPEN=1;constructor(){this.readyState=1;this.sent=[];sockets.push(this)}send(s){this.sent.push(JSON.parse(s))}close(){this.readyState=3}}
   const context={document:{getElementById:id=>elements[id],querySelectorAll:()=>buttons},window:{addEventListener:(n,f)=>{(handlers[n]??=[]).push(f)}},localStorage:{getItem:()=>null,setItem(){}},location:{protocol:'http:',host:'localhost:3000'},WebSocket:Socket,requestAnimationFrame:f=>queue.push(f),performance:{now:()=>now},Math,Map,JSON};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../public/game.js'),'utf8'),context);
+  const game = ['game.part1','game.part2','game.part3'].map(f => fs.readFileSync(path.join(__dirname,'../public',f))).reduce((a,b) => Buffer.concat([a,b]), Buffer.alloc(0)).toString('utf8');
+  vm.runInNewContext(game,context);
   function frame(){const callbacks=queue;queue=[];now+=50;for(const f of callbacks)f(now)}
   elements.form.fire('submit');assert.equal(elements.game.hidden,false);sockets[0].onopen();assert.equal(sockets[0].sent[0].type,'join');
   frame();frame();buttons[1].fire('pointerdown',{pointerId:1});for(let i=0;i<8;i++)frame();buttons[1].fire('pointerup');const moves=sockets[0].sent.filter(m=>m.type==='move');assert(moves.at(-1).x>130);
