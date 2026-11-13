@@ -1,0 +1,16 @@
+{
+  "name": "reino-dos-ecos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aventura lateral multiplayer leve, com arte procedural original.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "8.21.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
